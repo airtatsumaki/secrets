@@ -14,3 +14,8 @@ body {
   color: #fff;
   background-color: #000;
 }
+
+.reg-error{
+  padding-top: 15px;
+  color: red;
+}

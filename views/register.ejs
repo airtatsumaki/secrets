@@ -19,7 +19,9 @@
             </div>
             <button type="submit" class="btn btn-dark">Register</button>
           </form>
-
+          <% if (result == "error") { %>
+            <div class="reg-error">* username already taken. try a different username</div>
+          <% } %>
         </div>
       </div>
     </div>
