@@ -1,9 +1,10 @@
 import express from "express";
 import dotenv from "dotenv";
+import md5 from "md5";
 dotenv.config();
 import mongoose, { Schema } from "mongoose";
 mongoose.set("strictQuery", true);
-import mongooseEncryption from 'mongoose-encryption';
+// import mongooseEncryption from 'mongoose-encryption';
 
 const app = express();
 // instead of body-parser
@@ -26,7 +27,7 @@ const userSchema = new mongoose.Schema({
   password: {type: String, required: true}
 });
 
-userSchema.plugin(mongooseEncryption, {secret: process.env.SECRET, encryptedFields: ["password"]});
+// userSchema.plugin(mongooseEncryption, {secret: process.env.SECRET, encryptedFields: ["password"]});
 
 const User = mongoose.model("User", userSchema);
 
@@ -43,7 +44,7 @@ app.route("/register")
   .post(async (req, res) => {
     try{
       const username = req.body.username;
-      const password = req.body.password;
+      const password = md5(req.body.password);
       const result = await User.findOne({email: username});
       if(result){
         res.render("register", {result: "error"});
@@ -64,14 +65,11 @@ app.route("/login")
 .post(async (req, res) => {
   try{
     const username = req.body.username;
-    const password = req.body.password;
-    const result = await User.findOne({email: username});
+    const password = md5(req.body.password);
+    const result = await User.findOne({email: username, password: md5(req.body.password)});
+    console.log(result);
     if(result){
-      if(result.password === password){
-        res.redirect("secrets");
-      } else {
-        res.render("login", {result: "error"});
-      }
+      res.redirect("secrets");
     } else {
       res.render("login", {result: "error"});
     }
