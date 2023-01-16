@@ -4,6 +4,7 @@ import md5 from "md5";
 dotenv.config();
 import mongoose, { Schema } from "mongoose";
 mongoose.set("strictQuery", true);
+import bcrypt from 'bcrypt';
 // import mongooseEncryption from 'mongoose-encryption';
 
 const app = express();
@@ -44,7 +45,8 @@ app.route("/register")
   .post(async (req, res) => {
     try{
       const username = req.body.username;
-      const password = md5(req.body.password);
+      // const password = md5(req.body.password);
+      const password = bcrypt.hashSync(req.body.password, 10);
       const result = await User.findOne({email: username});
       if(result){
         res.render("register", {result: "error"});
@@ -65,11 +67,17 @@ app.route("/login")
 .post(async (req, res) => {
   try{
     const username = req.body.username;
-    const password = md5(req.body.password);
-    const result = await User.findOne({email: username, password: md5(req.body.password)});
+    // const password = md5(req.body.password);
+    const password = req.body.password;
+    const result = await User.findOne({email: username});
     console.log(result);
     if(result){
-      res.redirect("secrets");
+      if(bcrypt.compareSync(req.body.password, result.password)){
+        res.redirect("secrets");
+      }
+      else{
+        res.render("login", {result: "error"});
+      }
     } else {
       res.render("login", {result: "error"});
     }
