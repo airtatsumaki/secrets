@@ -180,9 +180,9 @@ app.route("/secrets")
     result.forEach(function(item){
       console.log(item.secret);
       allSecrets.push(item.secret);
-      res.render("secrets", {content: allSecrets});
     })
   }
+  res.render("secrets", {content: allSecrets});
 });
 
 app.route("/logout")
