@@ -9,6 +9,10 @@ mongoose.set("strictQuery", true);
 import session from "express-session";
 import passport from "passport";
 import passportLocalMongoose from "passport-local-mongoose";
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import findOrCreate from 'mongoose-findorcreate';
+
+//http://localhost:3000/auth/google/secrets
 
 const app = express();
 // instead of body-parser
@@ -37,18 +41,46 @@ try {
 }
 
 const userSchema = new mongoose.Schema({
-  username: {type: String, required: true},
-  password: {type: String, required: true}
+  username: {type: String},
+  // password: {type: String},
+  googleId: {type: String},
+  secret: {type: String},
 });
 
 // userSchema.plugin(mongooseEncryption, {secret: process.env.SECRET, encryptedFields: ["password"]});
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 const User = mongoose.model("User", userSchema);
 
 passport.use(User.createStrategy());
 
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+// passport.serializeUser(User.serializeUser());
+// passport.deserializeUser(User.deserializeUser());
+
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
+});
+passport.deserializeUser(function(id, done) {
+  User.findById(id, function(err, user){
+    done(err, user);
+  });
+});
+
+
+passport.use(new GoogleStrategy({
+  clientID: process.env.CLIENT_ID,
+  clientSecret: process.env.CLIENT_SECRET,
+  callbackURL: "http://localhost:3000/auth/google/secrets",
+  // userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+},
+function(accessToken, refreshToken, profile, cb) {
+  console.log(profile);
+
+  User.findOrCreate({ googleId: profile.id }, function (err, user) {
+    return cb(err, user);
+  });
+}
+));
 
 app.get("/", (req, res) => {
   res.render("home");
@@ -62,7 +94,7 @@ app.route("/register")
     const username = req.body.username;
     const password = req.body.password;
     console.log(username, password);
-    User.register({username: username, password: password}, password, function(err, user) {
+    User.register({username: username}, password, function(err, user) {
       if (err) {
         console.log(err);
         res.render("register", {result: "error"});
@@ -140,9 +172,18 @@ app.route("/login")
 })
 
 app.route("/secrets")
-.get((req, res) => {
-  req.isAuthenticated() ? res.render("secrets") : res.redirect("login");
-})
+.get(async (req, res) => {
+  // req.isAuthenticated() ? res.render("secrets") : res.redirect("login");
+  const result = await User.find({"secret": { $ne: null }});
+  let allSecrets = [];
+  if(result){
+    result.forEach(function(item){
+      console.log(item.secret);
+      allSecrets.push(item.secret);
+      res.render("secrets", {content: allSecrets});
+    })
+  }
+});
 
 app.route("/logout")
 .get((req, res) => {
@@ -150,5 +191,32 @@ app.route("/logout")
     err ? console.log(err) : res.redirect("/");
   });
 })
+
+app.get("/auth/google",
+  passport.authenticate('google', { scope: ['profile'] }));
+
+app.get("/auth/google/secrets", 
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    res.redirect("/secrets");
+});
+
+app.route("/submit")
+.get((req, res) => {
+  req.isAuthenticated() ? res.render("submit") : res.redirect("/login");
+})
+.post(async (req, res) => {
+  // console.log(req.body);
+  // console.log(req.user);
+  console.log("submitting secret");
+  const result = await User.findOne({_id: req.user._id});
+  // console.log(result);
+  if(result){
+    result.secret = req.body.secret;
+    result.save();
+  }
+  res.redirect("/secrets");
+});
 
 app.listen(process.env.PORT || 3000, () => console.log("Server listening in port 3000"));
